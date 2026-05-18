@@ -5,86 +5,88 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Eagle Library Viewer</title>
 <style>
+:root{--bg:#1a1a2e;--bg-sidebar:#16213e;--bg-thumb:#0f3460;--border:#0f3460;--text:#e0e0e0;--text-dim:#666;--text-muted:#555;--text-faint:#444;--accent:#e94560;--accent-hover:#c7354d;--scrollbar:#0f3460;--input-bg:#1a1a2e;--btn-bg:#0f3460;--lb-bg:rgba(0,0,0,.92);--lb-text:#ccc;--lb-text-dim:#888;--lb-btn:rgba(255,255,255,.15);--lb-btn-hover:rgba(255,255,255,.3);--lb-input-bg:rgba(255,255,255,.1);--lb-input-border:rgba(255,255,255,.2);--lb-input-text:#fff;--lb-bar:rgba(0,0,0,.75);--lb-nav:rgba(255,255,255,.5);--lb-nav-hover:#fff;--lb-close:#fff;--lb-close-hover:#e94560}
+[data-theme="light"]{--bg:#f0f0f0;--bg-sidebar:#fff;--bg-thumb:#e0e0e0;--border:#d0d0d0;--text:#222;--text-dim:#888;--text-muted:#999;--text-faint:#bbb;--accent:#e94560;--accent-hover:#d63851;--scrollbar:#c0c0c0;--input-bg:#fff;--btn-bg:#e0e0e0;--lb-bg:rgba(240,240,240,.95);--lb-text:#444;--lb-text-dim:#888;--lb-btn:rgba(0,0,0,.1);--lb-btn-hover:rgba(0,0,0,.18);--lb-input-bg:rgba(0,0,0,.06);--lb-input-border:rgba(0,0,0,.15);--lb-input-text:#222;--lb-bar:rgba(240,240,240,.88);--lb-nav:rgba(0,0,0,.4);--lb-nav-hover:#222;--lb-close:#555;--lb-close-hover:#e94560}
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#1a1a2e;color:#e0e0e0}
+html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text)}
 
 .welcome{display:flex;justify-content:center;align-items:center;height:100vh;flex-direction:column;gap:16px}
-.welcome h2{color:#e94560;font-size:24px}
-.welcome p{color:#666;font-size:14px}
-.welcome button{padding:12px 32px;font-size:16px;background:#e94560;color:#fff;border:none;border-radius:8px;cursor:pointer;transition:background .2s}
-.welcome button:hover{background:#c7354d}
-.welcome .hint{font-size:12px;color:#444}
+.welcome h2{color:var(--accent);font-size:24px}
+.welcome p{color:var(--text-dim);font-size:14px}
+.welcome button{padding:12px 32px;font-size:16px;background:var(--accent);color:#fff;border:none;border-radius:8px;cursor:pointer;transition:background .2s}
+.welcome button:hover{background:var(--accent-hover)}
+.welcome .hint{font-size:12px;color:var(--text-faint)}
 
 .app{display:flex;height:100vh}
 
-.sidebar{width:280px;min-width:280px;background:#16213e;border-right:1px solid #0f3460;display:flex;flex-direction:column}
-.sidebar-header{padding:16px 20px;font-size:18px;font-weight:600;border-bottom:1px solid #0f3460;color:#e94560;cursor:pointer}
+.sidebar{width:280px;min-width:280px;background:var(--bg-sidebar);border-right:1px solid var(--border);display:flex;flex-direction:column}
+.sidebar-header{padding:16px 20px;font-size:18px;font-weight:600;border-bottom:1px solid var(--border);color:var(--accent);cursor:pointer}
 .sidebar-header:hover{opacity:.8}
-.sidebar-search{padding:8px 12px;border-bottom:1px solid #0f3460}
-.sidebar-search input{width:100%;padding:6px 10px;background:#1a1a2e;border:1px solid #0f3460;border-radius:4px;color:#e0e0e0;font-size:13px;outline:none}
-.sidebar-search input:focus{border-color:#e94560}
+.sidebar-search{padding:8px 12px;border-bottom:1px solid var(--border)}
+.sidebar-search input{width:100%;padding:6px 10px;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:13px;outline:none}
+.sidebar-search input:focus{border-color:var(--accent)}
 .sidebar-tree{flex:1;overflow-y:auto;padding:8px 0}
 .sidebar-tree::-webkit-scrollbar{width:6px}
-.sidebar-tree::-webkit-scrollbar-thumb{background:#0f3460;border-radius:3px}
-.sidebar-footer{padding:8px 20px;font-size:12px;color:#555;border-top:1px solid #0f3460;text-align:right}
+.sidebar-tree::-webkit-scrollbar-thumb{background:var(--scrollbar);border-radius:3px}
+.sidebar-footer{padding:8px 20px;font-size:12px;color:var(--text-muted);border-top:1px solid var(--border);text-align:right}
 
 .tree-label{display:flex;align-items:center;padding:5px 12px;cursor:pointer;font-size:13px;white-space:nowrap;transition:background .15s}
 .tree-label:hover{background:rgba(233,69,96,.15)}
-.tree-label.active{background:rgba(233,69,96,.25);color:#e94560}
-.tree-arrow{display:inline-block;width:16px;text-align:center;font-size:10px;color:#555;transition:transform .2s;flex-shrink:0}
+.tree-label.active{background:rgba(233,69,96,.25);color:var(--accent)}
+.tree-arrow{display:inline-block;width:16px;text-align:center;font-size:10px;color:var(--text-muted);transition:transform .2s;flex-shrink:0}
 .tree-arrow.open{transform:rotate(90deg)}
 .tree-arrow.leaf{visibility:hidden}
 .tree-name{flex:1;overflow:hidden;text-overflow:ellipsis}
-.tree-count{font-size:11px;color:#555;margin-left:6px;flex-shrink:0}
+.tree-count{font-size:11px;color:var(--text-muted);margin-left:6px;flex-shrink:0}
 .tree-children{display:none}
 .tree-children.open{display:block}
 
 .content{flex:1;display:flex;flex-direction:column;overflow:hidden}
-.content-header{padding:12px 20px;border-bottom:1px solid #0f3460;background:#16213e;display:flex;align-items:center;justify-content:space-between;min-height:52px}
+.content-header{padding:12px 20px;border-bottom:1px solid var(--border);background:var(--bg-sidebar);display:flex;align-items:center;justify-content:space-between;min-height:52px}
 .content-header h2{font-size:16px;font-weight:500}
-.content-header .info{font-size:12px;color:#666;margin-top:2px}
-.content-header button{background:#0f3460;border:none;color:#e0e0e0;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px}
-.content-header button:hover{background:#e94560}
+.content-header .info{font-size:12px;color:var(--text-dim);margin-top:2px}
+.content-header button{background:var(--btn-bg);border:none;color:var(--text);padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px}
+.content-header button:hover{background:var(--accent)}
 
 .grid{flex:1;overflow-y:auto;padding:16px;display:flex;flex-wrap:wrap;align-content:flex-start;gap:8px}
 .grid::-webkit-scrollbar{width:8px}
-.grid::-webkit-scrollbar-thumb{background:#0f3460;border-radius:4px}
+.grid::-webkit-scrollbar-thumb{background:var(--scrollbar);border-radius:4px}
 
-.thumb{width:160px;height:160px;border-radius:6px;overflow:hidden;cursor:pointer;position:relative;background:#0f3460;transition:transform .15s,box-shadow .15s}
+.thumb{width:160px;height:160px;border-radius:6px;overflow:hidden;cursor:pointer;position:relative;background:var(--bg-thumb);transition:transform .15s,box-shadow .15s}
 .thumb:hover{transform:scale(1.05);box-shadow:0 4px 20px rgba(233,69,96,.3)}
 .thumb img{width:100%;height:100%;object-fit:cover;display:block}
 .thumb .label{position:absolute;bottom:0;left:0;right:0;padding:4px 6px;background:linear-gradient(transparent,rgba(0,0,0,.8));font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
 
-.empty-state{flex:1;display:flex;justify-content:center;align-items:center;color:#444;font-size:16px}
+.empty-state{flex:1;display:flex;justify-content:center;align-items:center;color:var(--text-faint);font-size:16px}
 
-.lightbox{display:none;position:fixed;inset:0;background:#000;z-index:1000;justify-content:center;align-items:center;flex-direction:column}
+.lightbox{display:none;position:fixed;inset:0;background:var(--lb-bg);z-index:1000;justify-content:center;align-items:center;flex-direction:column}
 .lightbox.open{display:flex}
 .lb-stage{position:relative;width:95vw;height:82vh;flex-shrink:0}
 .lb-img{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:100%;height:100%;object-fit:contain;transition:opacity .5s ease}
 .lb-img.front{opacity:1;z-index:1}
 .lb-img.back{opacity:0;z-index:0}
-.lightbox-close{position:fixed;top:12px;right:16px;font-size:32px;color:#fff;cursor:pointer;z-index:1001;opacity:.6;line-height:1}
-.lightbox-close:hover{opacity:1;color:#e94560}
-.lightbox-nav{position:fixed;top:50%;transform:translateY(-50%);font-size:56px;color:rgba(255,255,255,.5);cursor:pointer;z-index:1001;user-select:none;line-height:1}
-.lightbox-nav:hover{color:#fff}
+.lightbox-close{position:fixed;top:12px;right:16px;font-size:32px;color:var(--lb-close);cursor:pointer;z-index:1001;opacity:.6;line-height:1}
+.lightbox-close:hover{opacity:1;color:var(--lb-close-hover)}
+.lightbox-nav{position:fixed;top:50%;transform:translateY(-50%);font-size:56px;color:var(--lb-nav);cursor:pointer;z-index:1001;user-select:none;line-height:1}
+.lightbox-nav:hover{color:var(--lb-nav-hover)}
 .lb-prev{left:16px}
 .lb-next{right:16px}
-.lb-name{margin-top:12px;font-size:14px;color:#999}
-.lb-idx{font-size:13px;color:#666;margin-top:4px}
+.lb-name{margin-top:12px;font-size:14px;color:var(--lb-text-dim)}
+.lb-idx{font-size:13px;color:var(--lb-text-dim);margin-top:4px}
 .header-btns{display:flex;align-items:center;gap:10px}
-.header-btns select{padding:4px 8px;background:#1a1a2e;border:1px solid #0f3460;border-radius:4px;color:#e0e0e0;font-size:12px;outline:none;cursor:pointer}
-.header-btns select:focus{border-color:#e94560}
+.header-btns select{padding:4px 8px;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px;outline:none;cursor:pointer}
+.header-btns select:focus{border-color:var(--accent)}
 .play-controls{display:flex;align-items:center;gap:6px}
-.play-controls input[type=number]{width:48px;padding:3px 4px;background:#1a1a2e;border:1px solid #0f3460;border-radius:4px;color:#e0e0e0;font-size:12px;text-align:center}
-.play-controls .unit{font-size:12px;color:#555}
-.play-bar{position:fixed;bottom:0;left:0;right:0;padding:12px 24px;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;gap:16px;z-index:1001;backdrop-filter:blur(4px)}
+.play-controls input[type=number]{width:48px;padding:3px 4px;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px;text-align:center}
+.play-controls .unit{font-size:12px;color:var(--text-muted)}
+.play-bar{position:fixed;bottom:0;left:0;right:0;padding:12px 24px;background:var(--lb-bar);display:none;align-items:center;justify-content:center;gap:16px;z-index:1001;backdrop-filter:blur(4px)}
 .play-bar.show{display:flex}
-.play-bar button{background:rgba(255,255,255,.15);border:none;color:#fff;padding:6px 16px;border-radius:4px;cursor:pointer;font-size:13px;transition:background .15s}
-.play-bar button:hover{background:rgba(255,255,255,.3)}
-.play-bar button.active{background:#e94560}
-.play-bar label{font-size:13px;color:#888}
-.play-bar input[type=number]{width:50px;padding:4px 6px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:4px;color:#fff;font-size:13px;text-align:center}
-.play-bar .unit{font-size:13px;color:#666}
+.play-bar button{background:var(--lb-btn);border:none;color:var(--lb-input-text);padding:6px 16px;border-radius:4px;cursor:pointer;font-size:13px;transition:background .15s}
+.play-bar button:hover{background:var(--lb-btn-hover)}
+.play-bar button.active{background:var(--accent)}
+.play-bar label{font-size:13px;color:var(--lb-text-dim)}
+.play-bar input[type=number]{width:50px;padding:4px 6px;background:var(--lb-input-bg);border:1px solid var(--lb-input-border);border-radius:4px;color:var(--lb-input-text);font-size:13px;text-align:center}
+.play-bar .unit{font-size:13px;color:var(--lb-text-dim)}
 </style>
 </head>
 <body>
@@ -107,6 +109,7 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
     <div class="content-header">
       <div><h2 id="title">选择一个文件夹</h2><div class="info" id="info"></div></div>
       <div class="header-btns">
+        <button id="btnTheme" onclick="toggleTheme()" title="切换主题">&#9788;</button>
         <select id="sortSelect" onchange="changeSort(this.value)">
           <option value="name">按文件名</option>
           <option value="date">按日期</option>
@@ -174,6 +177,17 @@ const imagesDir = async () => {
 };
 
 const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+// ---- 主题 ----
+function applyTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem('theme', t);
+  document.getElementById('btnTheme').innerHTML = t === 'light' ? '&#9790;' : '&#9788;';
+}
+function toggleTheme() {
+  applyTheme(document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
+}
+applyTheme(localStorage.getItem('theme') || 'dark');
 
 // ---- 初始化 ----
 window.addEventListener('load', async () => {
