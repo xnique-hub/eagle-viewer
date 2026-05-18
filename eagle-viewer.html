@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Eagle Library Viewer</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#1a1a2e;color:#e0e0e0}
+
+.welcome{display:flex;justify-content:center;align-items:center;height:100vh;flex-direction:column;gap:16px}
+.welcome h2{color:#e94560;font-size:24px}
+.welcome p{color:#666;font-size:14px}
+.welcome button{padding:12px 32px;font-size:16px;background:#e94560;color:#fff;border:none;border-radius:8px;cursor:pointer;transition:background .2s}
+.welcome button:hover{background:#c7354d}
+.welcome .hint{font-size:12px;color:#444}
+
+.app{display:flex;height:100vh}
+
+.sidebar{width:280px;min-width:280px;background:#16213e;border-right:1px solid #0f3460;display:flex;flex-direction:column}
+.sidebar-header{padding:16px 20px;font-size:18px;font-weight:600;border-bottom:1px solid #0f3460;color:#e94560;cursor:pointer}
+.sidebar-header:hover{opacity:.8}
+.sidebar-search{padding:8px 12px;border-bottom:1px solid #0f3460}
+.sidebar-search input{width:100%;padding:6px 10px;background:#1a1a2e;border:1px solid #0f3460;border-radius:4px;color:#e0e0e0;font-size:13px;outline:none}
+.sidebar-search input:focus{border-color:#e94560}
+.sidebar-tree{flex:1;overflow-y:auto;padding:8px 0}
+.sidebar-tree::-webkit-scrollbar{width:6px}
+.sidebar-tree::-webkit-scrollbar-thumb{background:#0f3460;border-radius:3px}
+.sidebar-footer{padding:8px 20px;font-size:12px;color:#555;border-top:1px solid #0f3460;text-align:right}
+
+.tree-label{display:flex;align-items:center;padding:5px 12px;cursor:pointer;font-size:13px;white-space:nowrap;transition:background .15s}
+.tree-label:hover{background:rgba(233,69,96,.15)}
+.tree-label.active{background:rgba(233,69,96,.25);color:#e94560}
+.tree-arrow{display:inline-block;width:16px;text-align:center;font-size:10px;color:#555;transition:transform .2s;flex-shrink:0}
+.tree-arrow.open{transform:rotate(90deg)}
+.tree-arrow.leaf{visibility:hidden}
+.tree-name{flex:1;overflow:hidden;text-overflow:ellipsis}
+.tree-count{font-size:11px;color:#555;margin-left:6px;flex-shrink:0}
+.tree-children{display:none}
+.tree-children.open{display:block}
+
+.content{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.content-header{padding:12px 20px;border-bottom:1px solid #0f3460;background:#16213e;display:flex;align-items:center;justify-content:space-between;min-height:52px}
+.content-header h2{font-size:16px;font-weight:500}
+.content-header .info{font-size:12px;color:#666;margin-top:2px}
+.content-header button{background:#0f3460;border:none;color:#e0e0e0;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:12px}
+.content-header button:hover{background:#e94560}
+
+.grid{flex:1;overflow-y:auto;padding:16px;display:flex;flex-wrap:wrap;align-content:flex-start;gap:8px}
+.grid::-webkit-scrollbar{width:8px}
+.grid::-webkit-scrollbar-thumb{background:#0f3460;border-radius:4px}
+
+.thumb{width:160px;height:160px;border-radius:6px;overflow:hidden;cursor:pointer;position:relative;background:#0f3460;transition:transform .15s,box-shadow .15s}
+.thumb:hover{transform:scale(1.05);box-shadow:0 4px 20px rgba(233,69,96,.3)}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.thumb .label{position:absolute;bottom:0;left:0;right:0;padding:4px 6px;background:linear-gradient(transparent,rgba(0,0,0,.8));font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none}
+
+.empty-state{flex:1;display:flex;justify-content:center;align-items:center;color:#444;font-size:16px}
+
+.lightbox{display:none;position:fixed;inset:0;background:#000;z-index:1000;justify-content:center;align-items:center;flex-direction:column}
+.lightbox.open{display:flex}
+.lb-stage{position:relative;width:95vw;height:82vh;flex-shrink:0}
+.lb-img{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:100%;height:100%;object-fit:contain;transition:opacity .5s ease}
+.lb-img.front{opacity:1;z-index:1}
+.lb-img.back{opacity:0;z-index:0}
+.lightbox-close{position:fixed;top:12px;right:16px;font-size:32px;color:#fff;cursor:pointer;z-index:1001;opacity:.6;line-height:1}
+.lightbox-close:hover{opacity:1;color:#e94560}
+.lightbox-nav{position:fixed;top:50%;transform:translateY(-50%);font-size:56px;color:rgba(255,255,255,.5);cursor:pointer;z-index:1001;user-select:none;line-height:1}
+.lightbox-nav:hover{color:#fff}
+.lb-prev{left:16px}
+.lb-next{right:16px}
+.lb-name{margin-top:12px;font-size:14px;color:#999}
+.lb-idx{font-size:13px;color:#666;margin-top:4px}
+.header-btns{display:flex;align-items:center;gap:10px}
+.play-controls{display:flex;align-items:center;gap:6px}
+.play-controls input[type=number]{width:48px;padding:3px 4px;background:#1a1a2e;border:1px solid #0f3460;border-radius:4px;color:#e0e0e0;font-size:12px;text-align:center}
+.play-controls .unit{font-size:12px;color:#555}
+.play-bar{position:fixed;bottom:0;left:0;right:0;padding:12px 24px;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;gap:16px;z-index:1001;backdrop-filter:blur(4px)}
+.play-bar.show{display:flex}
+.play-bar button{background:rgba(255,255,255,.15);border:none;color:#fff;padding:6px 16px;border-radius:4px;cursor:pointer;font-size:13px;transition:background .15s}
+.play-bar button:hover{background:rgba(255,255,255,.3)}
+.play-bar button.active{background:#e94560}
+.play-bar label{font-size:13px;color:#888}
+.play-bar input[type=number]{width:50px;padding:4px 6px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);border-radius:4px;color:#fff;font-size:13px;text-align:center}
+.play-bar .unit{font-size:13px;color:#666}
+</style>
+</head>
+<body>
+
+<div id="welcome" class="welcome">
+  <h2>Eagle Library Viewer</h2>
+  <p>基于 File System Access API 实时读取本地 Eagle 图库</p>
+  <button onclick="pickDir()">选择图库目录</button>
+  <p class="hint">选择 .library 目录（如 otherworld.library），需要 Chrome / Edge 浏览器</p>
+</div>
+
+<div id="app" class="app" style="display:none">
+  <div class="sidebar">
+    <div class="sidebar-header" onclick="pickDir()" title="点击切换图库目录">otherworld.library</div>
+    <div class="sidebar-search"><input type="text" id="searchInput" placeholder="搜索文件夹..." oninput="renderTree()"></div>
+    <div class="sidebar-tree" id="tree"></div>
+    <div class="sidebar-footer" id="footer"></div>
+  </div>
+  <div class="content">
+    <div class="content-header">
+      <div><h2 id="title">选择一个文件夹</h2><div class="info" id="info"></div></div>
+      <div class="header-btns">
+        <div class="play-controls">
+          <button id="btnPlay" onclick="startPlay()">▶ 播放</button>
+          <input type="number" id="intervalInput" value="3" min="0.5" max="60" step="0.5" title="播放间隔(秒)">
+          <span class="unit">秒</span>
+        </div>
+        <button id="btnAll" onclick="showAll()">全部图片</button>
+      </div>
+    </div>
+    <div class="grid" id="grid" style="display:none"></div>
+    <div class="empty-state" id="emptyState">点击左侧文件夹开始浏览</div>
+  </div>
+</div>
+
+<div class="lightbox" id="lightbox">
+  <div class="lightbox-close" onclick="closeLB()">&times;</div>
+  <div class="lightbox-nav lb-prev" onclick="navLB(-1)">&#8249;</div>
+  <div class="lightbox-nav lb-next" onclick="navLB(1)">&#8250;</div>
+  <div class="lb-stage">
+    <img id="lbImgA" class="lb-img front" src="">
+    <img id="lbImgB" class="lb-img back" src="">
+  </div>
+  <div class="lb-name" id="lbName"></div>
+  <div class="lb-idx" id="lbIdx"></div>
+  <div class="play-bar" id="playBar">
+    <button id="lbPlayBtn" onclick="togglePlay()">⏸ 暂停</button>
+    <label>间隔</label>
+    <input type="number" id="lbInterval" value="3" min="0.5" max="60" step="0.5" onchange="updateInterval(this.value)">
+    <span class="unit">秒</span>
+  </div>
+</div>
+
+<script>
+// ---- IndexedDB 持久化目录句柄 ----
+const IDB = {
+  _db: null,
+  async db() {
+    if (this._db) return this._db;
+    return new Promise((ok, no) => {
+      const r = indexedDB.open('eagle-viewer', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('s');
+      r.onsuccess = () => { this._db = r.result; ok(this._db); };
+      r.onerror = no;
+    });
+  },
+  async get(k) { return new Promise(async ok => { const r = (await this.db()).transaction('s').objectStore('s').get(k); r.onsuccess = () => ok(r.result); r.onerror = () => ok(null); }); },
+  async put(k, v) { return new Promise(async ok => { const r = (await this.db()).transaction('s','readwrite').objectStore('s').put(v,k); r.oncomplete = ok; r.onerror = ok; }); }
+};
+
+// ---- 状态 ----
+let dirH = null, imagesDirH = null;
+let folderTree = [], folderMap = {}, folderImgMap = {}, folderCounts = {}, totalCount = 0;
+let activeId = null, curImgs = [], lbPos = -1;
+let thumbURLs = [], io = null, gridImgMap = new Map();
+let lbUrls = [null, null], lbFront = 0; // 0=A front, 1=B front
+let playTimer = null, isPlaying = false, playInterval = 3;
+
+const imagesDir = async () => {
+  if (!imagesDirH) imagesDirH = await dirH.getDirectoryHandle('images');
+  return imagesDirH;
+};
+
+const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+// ---- 初始化 ----
+window.addEventListener('load', async () => {
+  if (!window.showDirectoryPicker) {
+    document.getElementById('welcome').innerHTML = '<h2>浏览器不支持</h2><p style="color:#999">请使用 Chrome 或 Edge 浏览器打开此页面</p>';
+    return;
+  }
+  const saved = await IDB.get('dir');
+  if (saved) {
+    try {
+      if (await saved.queryPermission({ mode: 'read' }) === 'granted') {
+        dirH = saved;
+        loadLibrary();
+        return;
+      }
+    } catch {}
+  }
+});
+
+async function pickDir() {
+  try { dirH = await window.showDirectoryPicker({ mode: 'read' }); } catch { return; }
+  IDB.put('dir', dirH);
+  loadLibrary();
+}
+
+async function loadLibrary() {
+  // 1. 读取元数据
+  try {
+    const fh = await dirH.getFileHandle('metadata.json');
+    const meta = JSON.parse(await (await fh.getFile()).text());
+    folderTree = meta.folders || [];
+  } catch (e) {
+    document.querySelector('#welcome p').textContent = '无法读取 metadata.json: ' + e.message;
+    return;
+  }
+
+  // 2. 初始化文件夹结构
+  folderMap = {}; folderImgMap = {}; folderCounts = {}; totalCount = 0;
+  activeId = null; imagesDirH = null;
+  idxFolders(folderTree, '');
+
+  // 3. 同步切换 UI（关键：所有 DOM 更新在一个同步块内完成）
+  renderTree();
+  document.getElementById('welcome').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('title').textContent = '选择一个文件夹';
+  document.getElementById('info').textContent = '';
+  document.getElementById('grid').style.display = 'none';
+  document.getElementById('grid').innerHTML = '';
+  document.getElementById('emptyState').style.display = 'flex';
+  document.getElementById('emptyState').textContent = '索引中...';
+
+  // 4. 用 setTimeout 把索引推到下一个宏任务，确保浏览器先渲染 UI
+  setTimeout(() => {
+    indexImgs().catch(e => {
+      document.getElementById('emptyState').textContent = '索引失败: ' + e.message;
+    });
+  }, 0);
+}
+
+function idxFolders(nodes, pp) {
+  for (const n of nodes) {
+    const path = pp ? pp + ' / ' + n.name : n.name;
+    folderMap[n.id] = { ...n, path };
+    folderImgMap[n.id] = [];
+    if (n.children) idxFolders(n.children, path);
+  }
+}
+
+async function indexImgs() {
+  const dir = await imagesDir();
+  let c = 0;
+  for await (const entry of dir.values()) {
+    if (!entry.name.endsWith('.info')) continue;
+    try {
+      const m = JSON.parse(await (await (await entry.getFileHandle('metadata.json')).getFile()).text());
+      const img = { id: m.id, name: m.name || '', ext: m.ext || '', dn: entry.name };
+      for (const fid of (m.folders || [])) {
+        if (folderImgMap[fid]) folderImgMap[fid].push(img);
+        else folderImgMap[fid] = [img];
+      }
+      c++;
+    } catch {}
+    if (c % 100 === 0) {
+      document.getElementById('footer').textContent = `索引中... ${c}`;
+      await new Promise(r => setTimeout(r, 0));
+    }
+  }
+  totalCount = c;
+  for (const fid in folderImgMap) folderImgMap[fid].sort((a, b) => a.name.localeCompare(b.name, 'zh'));
+  function calc(nodes) {
+    for (const n of nodes) {
+      let s = (folderImgMap[n.id] || []).length;
+      if (n.children) { calc(n.children); for (const ch of n.children) s += folderCounts[ch.id] || 0; }
+      folderCounts[n.id] = s;
+    }
+  }
+  calc(folderTree);
+  document.getElementById('footer').textContent = `${c} 张图片`;
+  document.getElementById('emptyState').textContent = '点击左侧文件夹开始浏览';
+  renderTree();
+}
+
+// ---- 树 ----
+function getAncestors(nodes, targetId) {
+  // 返回 targetId 的所有祖先 ID 集合
+  const result = new Set();
+  function walk(ns, trail) {
+    for (const n of ns) {
+      if (n.id === targetId) { trail.forEach(id => result.add(id)); return true; }
+      if (n.children && walk(n.children, [...trail, n.id])) return true;
+    }
+    return false;
+  }
+  walk(nodes, []);
+  return result;
+}
+
+function renderTree() {
+  const f = (document.getElementById('searchInput').value || '').toLowerCase();
+  const ancestors = activeId ? getAncestors(folderTree, activeId) : new Set();
+  document.getElementById('tree').innerHTML = treeHTML(folderTree, 0, f, ancestors);
+}
+
+function treeHTML(nodes, d, f, ancestors) {
+  let h = '';
+  for (const n of nodes) {
+    const cnt = folderCounts[n.id] || 0;
+    if (f && !n.name.toLowerCase().includes(f)) continue;
+    const has = n.children && n.children.length > 0;
+    const act = n.id === activeId;
+    const open = act || !!f || ancestors.has(n.id);
+    h += `<div class="tree-label${act?' active':''}" data-id="${n.id}" style="padding-left:${12+d*16}px">`;
+    h += `<span class="tree-arrow${has?(open?' open':''):' leaf'}">&#9654;</span>`;
+    h += `<span class="tree-name">${esc(n.name)}</span><span class="tree-count">${cnt}</span></div>`;
+    if (has) h += `<div class="tree-children${open?' open':''}">${treeHTML(n.children,d+1,f,ancestors)}</div>`;
+  }
+  return h;
+}
+
+// ---- 图片 ----
+function collect(fid) {
+  const m = new Map();
+  (function add(id) {
+    for (const i of (folderImgMap[id] || [])) m.set(i.id, i);
+    const n = folderMap[id];
+    if (n && n.children) for (const c of n.children) add(c.id);
+  })(fid);
+  return [...m.values()].sort((a, b) => a.name.localeCompare(b.name, 'zh'));
+}
+
+function collectAll() {
+  const m = new Map();
+  for (const imgs of Object.values(folderImgMap)) for (const i of imgs) m.set(i.id, i);
+  return [...m.values()].sort((a, b) => a.name.localeCompare(b.name, 'zh'));
+}
+
+async function selectFolder(id) {
+  activeId = id; renderTree();
+  await showImgs(folderMap[id].path, collect(id));
+}
+
+async function showAll() {
+  activeId = null; renderTree();
+  await showImgs('全部图片', collectAll());
+}
+
+async function showImgs(title, imgs) {
+  // 清理旧缩略图：清空 src 后 revoke 以强制释放 blob URL（避免快速切换文件夹时内存泄漏）
+  gridImgMap.forEach((url, el) => { try { el.src = ''; URL.revokeObjectURL(url); } catch {} });
+  gridImgMap.clear();
+  thumbURLs = [];
+  if (io) { io.disconnect(); io = null; }
+  // 防止灯箱打开时切换文件夹造成灯箱图片 blob URL 泄漏
+  try { document.getElementById('lbImgA').src = ''; } catch {}
+  try { document.getElementById('lbImgB').src = ''; } catch {}
+  // 中止正在进行的预加载
+  preloadEl.src = '';
+  curImgs = imgs;
+  document.getElementById('title').textContent = title;
+  document.getElementById('info').textContent = imgs.length + ' 张图片';
+  document.getElementById('emptyState').style.display = 'none';
+  const grid = document.getElementById('grid');
+  grid.style.display = 'flex';
+  grid.innerHTML = '';
+  for (let i = 0; i < imgs.length; i++) {
+    const d = document.createElement('div');
+    d.className = 'thumb';
+    d.innerHTML = `<img data-i="${i}" alt=""><div class="label">${esc(imgs[i].name)}</div>`;
+    d.onclick = () => openLB(i);
+    grid.appendChild(d);
+  }
+  io = new IntersectionObserver(es => {
+    for (const e of es) {
+      if (!e.isIntersecting) continue;
+      loadThumb(e.target, curImgs[+e.target.dataset.i]);
+      io.unobserve(e.target);
+    }
+  }, { root: grid, rootMargin: '300px', trackVisibility: true });
+  grid.querySelectorAll('img[data-i]').forEach(el => io.observe(el));
+}
+
+async function loadThumb(el, d) {
+  try {
+    const dir = await imagesDir();
+    const info = await dir.getDirectoryHandle(d.dn);
+    let file;
+    try { file = await (await info.getFileHandle(d.name + '_thumbnail.png')).getFile(); }
+    catch { file = await (await info.getFileHandle(d.name + '.' + d.ext)).getFile(); }
+    const url = URL.createObjectURL(file);
+    thumbURLs.push(url);
+    gridImgMap.set(el, url);
+    el.src = url;
+  } catch { el.alt = '?'; }
+}
+
+// ---- 灯箱 ----
+async function openLB(i) {
+  lbPos = i;
+  document.getElementById('lightbox').classList.add('open');
+  document.addEventListener('keydown', lbKey);
+  // 重置双图层
+  lbFront = 0;
+  lbUrls.forEach((u, j) => { if (u) { URL.revokeObjectURL(u); lbUrls[j] = null; } });
+  document.getElementById('lbImgA').src = '';
+  document.getElementById('lbImgB').src = '';
+  document.getElementById('lbImgA').className = 'lb-img front';
+  document.getElementById('lbImgB').className = 'lb-img back';
+  await updateLB();
+}
+
+async function loadImageData(d) {
+  const dir = await imagesDir();
+  const info = await dir.getDirectoryHandle(d.dn);
+  const file = await (await info.getFileHandle(d.name + '.' + d.ext)).getFile();
+  return URL.createObjectURL(file);
+}
+
+async function updateLB() {
+  const d = curImgs[lbPos];
+  document.getElementById('lbName').textContent = d.name;
+  document.getElementById('lbIdx').textContent = `${lbPos+1} / ${curImgs.length}`;
+
+  const backIdx = 1 - lbFront;
+  const frontEl = document.getElementById(lbFront === 0 ? 'lbImgA' : 'lbImgB');
+  const backEl = document.getElementById(backIdx === 0 ? 'lbImgA' : 'lbImgB');
+
+  // 释放 back 旧 URL
+  if (lbUrls[backIdx]) { URL.revokeObjectURL(lbUrls[backIdx]); lbUrls[backIdx] = null; }
+
+  try {
+    const url = await loadImageData(d);
+    lbUrls[backIdx] = url;
+    backEl.src = url;
+    backEl.onload = () => {
+      // 交叉淡入淡出
+      backEl.className = 'lb-img front';
+      frontEl.className = 'lb-img back';
+      lbFront = backIdx;
+    };
+  } catch {}
+
+  // 播放时预加载下一张
+  if (isPlaying && lbPos + 1 < curImgs.length) {
+    preloadNext(lbPos + 1);
+  }
+}
+
+let preloadEl = new Image();
+function preloadNext(idx) {
+  const d = curImgs[idx];
+  imagesDir().then(dir => dir.getDirectoryHandle(d.dn)
+    .then(info => info.getFileHandle(d.name + '.' + d.ext))
+    .then(fh => fh.getFile())
+    .then(file => { preloadEl.src = URL.createObjectURL(file); })
+    .catch(() => {})
+  );
+}
+
+function closeLB() {
+  document.getElementById('lightbox').classList.remove('open');
+  document.removeEventListener('keydown', lbKey);
+  stopPlay();
+  lbUrls.forEach((u, i) => { if (u) { URL.revokeObjectURL(u); lbUrls[i] = null; } });
+  document.getElementById('lbImgA').src = '';
+  document.getElementById('lbImgB').src = '';
+}
+
+function navLB(dir) {
+  lbPos = (lbPos + dir + curImgs.length) % curImgs.length;
+  updateLB();
+  if (isPlaying) scheduleNext();
+}
+
+function lbKey(e) {
+  if (e.key === 'Escape') closeLB();
+  else if (e.key === 'ArrowLeft') navLB(-1);
+  else if (e.key === 'ArrowRight') navLB(1);
+}
+
+// ---- 自动播放 ----
+function startPlay() {
+  if (curImgs.length === 0) return;
+  playInterval = parseFloat(document.getElementById('intervalInput').value) || 3;
+  document.getElementById('lbInterval').value = playInterval;
+  isPlaying = true;
+  document.getElementById('playBar').classList.add('show');
+  document.getElementById('lbPlayBtn').textContent = '⏸ 暂停';
+  document.getElementById('lbPlayBtn').classList.add('active');
+  openLB(0);
+  scheduleNext();
+}
+
+function stopPlay() {
+  isPlaying = false;
+  clearTimeout(playTimer);
+  document.getElementById('playBar').classList.remove('show');
+}
+
+function togglePlay() {
+  if (isPlaying) {
+    isPlaying = false;
+    clearTimeout(playTimer);
+    document.getElementById('lbPlayBtn').textContent = '▶ 继续';
+    document.getElementById('lbPlayBtn').classList.remove('active');
+  } else {
+    isPlaying = true;
+    document.getElementById('lbPlayBtn').textContent = '⏸ 暂停';
+    document.getElementById('lbPlayBtn').classList.add('active');
+    scheduleNext();
+  }
+}
+
+function scheduleNext() {
+  clearTimeout(playTimer);
+  playTimer = setTimeout(() => {
+    if (!isPlaying) return;
+    lbPos = (lbPos + 1) % curImgs.length;
+    updateLB();
+    scheduleNext();
+  }, playInterval * 1000);
+}
+
+function updateInterval(val) {
+  playInterval = Math.max(0.5, parseFloat(val) || 3);
+  document.getElementById('intervalInput').value = playInterval;
+  document.getElementById('lbInterval').value = playInterval;
+  if (isPlaying) scheduleNext();
+}
+
+// ---- 事件 ----
+document.getElementById('tree').addEventListener('click', e => {
+  const l = e.target.closest('.tree-label');
+  if (l && l.dataset.id) selectFolder(l.dataset.id);
+});
+document.getElementById('lightbox').addEventListener('click', e => {
+  if (e.target === document.getElementById('lightbox')) closeLB();
+});
+</script>
+</body>
+</html>
