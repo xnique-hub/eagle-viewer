@@ -72,6 +72,8 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 .lb-name{margin-top:12px;font-size:14px;color:#999}
 .lb-idx{font-size:13px;color:#666;margin-top:4px}
 .header-btns{display:flex;align-items:center;gap:10px}
+.header-btns select{padding:4px 8px;background:#1a1a2e;border:1px solid #0f3460;border-radius:4px;color:#e0e0e0;font-size:12px;outline:none;cursor:pointer}
+.header-btns select:focus{border-color:#e94560}
 .play-controls{display:flex;align-items:center;gap:6px}
 .play-controls input[type=number]{width:48px;padding:3px 4px;background:#1a1a2e;border:1px solid #0f3460;border-radius:4px;color:#e0e0e0;font-size:12px;text-align:center}
 .play-controls .unit{font-size:12px;color:#555}
@@ -105,6 +107,10 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
     <div class="content-header">
       <div><h2 id="title">选择一个文件夹</h2><div class="info" id="info"></div></div>
       <div class="header-btns">
+        <select id="sortSelect" onchange="changeSort(this.value)">
+          <option value="name">按文件名</option>
+          <option value="date">按日期</option>
+        </select>
         <div class="play-controls">
           <button id="btnPlay" onclick="startPlay()">▶ 播放</button>
           <input type="number" id="intervalInput" value="3" min="0.5" max="60" step="0.5" title="播放间隔(秒)">
@@ -157,6 +163,7 @@ const IDB = {
 let dirH = null, imagesDirH = null;
 let folderTree = [], folderMap = {}, folderImgMap = {}, folderCounts = {}, totalCount = 0;
 let activeId = null, curImgs = [], lbPos = -1;
+let sortBy = 'name'; // 'name' | 'date'
 let thumbURLs = [], io = null, gridImgMap = new Map();
 let lbUrls = [null, null], lbFront = 0; // 0=A front, 1=B front
 let playTimer = null, isPlaying = false, playInterval = 3;
@@ -243,7 +250,7 @@ async function indexImgs() {
     if (!entry.name.endsWith('.info')) continue;
     try {
       const m = JSON.parse(await (await (await entry.getFileHandle('metadata.json')).getFile()).text());
-      const img = { id: m.id, name: m.name || '', ext: m.ext || '', dn: entry.name };
+      const img = { id: m.id, name: m.name || '', ext: m.ext || '', dn: entry.name, btime: m.btime || 0 };
       for (const fid of (m.folders || [])) {
         if (folderImgMap[fid]) folderImgMap[fid].push(img);
         else folderImgMap[fid] = [img];
@@ -308,6 +315,13 @@ function treeHTML(nodes, d, f, ancestors) {
 }
 
 // ---- 图片 ----
+function sortImgs(arr) {
+  return arr.sort((a, b) => {
+    if (sortBy === 'date') return a.btime - b.btime;
+    return a.name.localeCompare(b.name, 'zh');
+  });
+}
+
 function collect(fid) {
   const m = new Map();
   (function add(id) {
@@ -315,18 +329,24 @@ function collect(fid) {
     const n = folderMap[id];
     if (n && n.children) for (const c of n.children) add(c.id);
   })(fid);
-  return [...m.values()].sort((a, b) => a.name.localeCompare(b.name, 'zh'));
+  return sortImgs([...m.values()]);
 }
 
 function collectAll() {
   const m = new Map();
   for (const imgs of Object.values(folderImgMap)) for (const i of imgs) m.set(i.id, i);
-  return [...m.values()].sort((a, b) => a.name.localeCompare(b.name, 'zh'));
+  return sortImgs([...m.values()]);
 }
 
 async function selectFolder(id) {
   activeId = id; renderTree();
   await showImgs(folderMap[id].path, collect(id));
+}
+
+function changeSort(type) {
+  sortBy = type;
+  if (activeId) selectFolder(activeId);
+  else if (curImgs.length) showAll();
 }
 
 async function showAll() {
