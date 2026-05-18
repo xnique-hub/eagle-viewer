@@ -82,10 +82,3 @@ const info = await dir.getDirectoryHandle(d.dn);       // images/{id}.info/
 const file = await info.getFileHandle(d.name + '_thumbnail.png');  // 缩略图
 const file = await info.getFileHandle(d.name + '.' + d.ext);       // 原图
 ```
-
-## 统计数据
-
-- 总图片数：4558
-- 缩略图缺失（无 `_thumbnail.png`）：26 张（0.6%），需 fallback 到原图
-- 原图缺失：0 张
-- `name` 为空：0 张

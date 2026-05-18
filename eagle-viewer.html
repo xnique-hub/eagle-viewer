@@ -365,7 +365,7 @@ async function showImgs(title, imgs) {
       loadThumb(e.target, curImgs[+e.target.dataset.i]);
       io.unobserve(e.target);
     }
-  }, { root: grid, rootMargin: '300px', trackVisibility: true });
+  }, { root: grid, rootMargin: '300px' });
   grid.querySelectorAll('img[data-i]').forEach(el => io.observe(el));
 }
 
@@ -393,7 +393,7 @@ async function openLB(i) {
   lbUrls.forEach((u, j) => { if (u) { URL.revokeObjectURL(u); lbUrls[j] = null; } });
   document.getElementById('lbImgA').src = '';
   document.getElementById('lbImgB').src = '';
-  document.getElementById('lbImgA').className = 'lb-img front';
+  document.getElementById('lbImgA').className = 'lb-img back';
   document.getElementById('lbImgB').className = 'lb-img back';
   await updateLB();
 }
