@@ -320,7 +320,7 @@ function treeHTML(nodes, d, f, ancestors) {
     const has = n.children && n.children.length > 0;
     const act = n.id === activeId;
     const open = act || !!f || ancestors.has(n.id);
-    h += `<div class="tree-label${act?' active':''}" data-id="${n.id}" style="padding-left:${12+d*16}px">`;
+    h += `<div class="tree-label${act?' active':''}" data-id="${esc(String(n.id))}" style="padding-left:${12+d*16}px">`;
     h += `<span class="tree-arrow${has?(open?' open':''):' leaf'}">&#9654;</span>`;
     h += `<span class="tree-name">${esc(n.name)}</span><span class="tree-count">${cnt}</span></div>`;
     if (has) h += `<div class="tree-children${open?' open':''}">${treeHTML(n.children,d+1,f,ancestors)}</div>`;
