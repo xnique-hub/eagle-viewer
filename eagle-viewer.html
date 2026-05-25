@@ -170,6 +170,8 @@ let sortBy = 'name'; // 'name' | 'date'
 let thumbURLs = [], io = null, gridImgMap = new Map();
 let lbUrls = [null, null], lbFront = 0; // 0=A front, 1=B front
 let playTimer = null, isPlaying = false, playInterval = 3;
+const UNCATEGORIZED_ID = '__uncategorized__';
+const UNCATEGORIZED_NODE = { id: UNCATEGORIZED_ID, name: '未分类', children: [], path: '未分类' };
 
 const imagesDir = async () => {
   if (!imagesDirH) imagesDirH = await dirH.getDirectoryHandle('images');
@@ -228,6 +230,8 @@ async function loadLibrary() {
   folderMap = {}; folderImgMap = {}; folderCounts = {}; totalCount = 0;
   activeId = null; imagesDirH = null;
   idxFolders(folderTree, '');
+  folderMap[UNCATEGORIZED_ID] = UNCATEGORIZED_NODE;
+  folderImgMap[UNCATEGORIZED_ID] = [];
 
   // 3. 同步切换 UI（关键：所有 DOM 更新在一个同步块内完成）
   renderTree();
@@ -264,8 +268,13 @@ async function indexImgs() {
     if (!entry.name.endsWith('.info')) continue;
     try {
       const m = JSON.parse(await (await (await entry.getFileHandle('metadata.json')).getFile()).text());
+      if (m.isDeleted === true) continue;
       const img = { id: m.id, name: m.name || '', ext: m.ext || '', dn: entry.name, btime: m.btime || 0 };
-      for (const fid of (m.folders || [])) {
+      const folders = Array.isArray(m.folders) ? m.folders : [];
+      if (folders.length === 0) {
+        folderImgMap[UNCATEGORIZED_ID].push(img);
+      }
+      for (const fid of folders) {
         if (folderImgMap[fid]) folderImgMap[fid].push(img);
         else folderImgMap[fid] = [img];
       }
@@ -286,12 +295,17 @@ async function indexImgs() {
     }
   }
   calc(folderTree);
+  folderCounts[UNCATEGORIZED_ID] = folderImgMap[UNCATEGORIZED_ID].length;
   document.getElementById('footer').textContent = `${c} 张图片`;
   document.getElementById('emptyState').textContent = '点击左侧文件夹开始浏览';
   renderTree();
 }
 
 // ---- 树 ----
+function treeNodes() {
+  return folderCounts[UNCATEGORIZED_ID] > 0 ? [UNCATEGORIZED_NODE, ...folderTree] : folderTree;
+}
+
 function getAncestors(nodes, targetId) {
   // 返回 targetId 的所有祖先 ID 集合
   const result = new Set();
@@ -308,8 +322,9 @@ function getAncestors(nodes, targetId) {
 
 function renderTree() {
   const f = (document.getElementById('searchInput').value || '').toLowerCase();
-  const ancestors = activeId ? getAncestors(folderTree, activeId) : new Set();
-  document.getElementById('tree').innerHTML = treeHTML(folderTree, 0, f, ancestors);
+  const nodes = treeNodes();
+  const ancestors = activeId ? getAncestors(nodes, activeId) : new Set();
+  document.getElementById('tree').innerHTML = treeHTML(nodes, 0, f, ancestors);
 }
 
 function treeHTML(nodes, d, f, ancestors) {
