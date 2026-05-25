@@ -95,12 +95,12 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
   <h2>Eagle Library Viewer</h2>
   <p>基于 File System Access API 实时读取本地 Eagle 图库</p>
   <button onclick="pickDir()">选择图库目录</button>
-  <p class="hint">选择 .library 目录（如 otherworld.library），需要 Chrome / Edge 浏览器</p>
+  <p class="hint">选择 .library 目录，需要 Chrome / Edge 浏览器</p>
 </div>
 
 <div id="app" class="app" style="display:none">
   <div class="sidebar">
-    <div class="sidebar-header" onclick="pickDir()" title="点击切换图库目录">otherworld.library</div>
+    <div class="sidebar-header" onclick="pickDir()" title="点击切换图库目录">Eagle Library</div>
     <div class="sidebar-search"><input type="text" id="searchInput" placeholder="搜索文件夹..." oninput="renderTree()"></div>
     <div class="sidebar-tree" id="tree"></div>
     <div class="sidebar-footer" id="footer"></div>
@@ -237,6 +237,7 @@ async function loadLibrary() {
   renderTree();
   document.getElementById('welcome').style.display = 'none';
   document.getElementById('app').style.display = 'flex';
+  document.querySelector('.sidebar-header').textContent = dirH.name || 'Eagle Library';
   document.getElementById('title').textContent = '选择一个文件夹';
   document.getElementById('info').textContent = '';
   document.getElementById('grid').style.display = 'none';
