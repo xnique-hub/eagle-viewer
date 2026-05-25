@@ -377,8 +377,8 @@ async function showImgs(title, imgs) {
   // 防止灯箱打开时切换文件夹造成灯箱图片 blob URL 泄漏
   try { document.getElementById('lbImgA').src = ''; } catch {}
   try { document.getElementById('lbImgB').src = ''; } catch {}
-  // 中止正在进行的预加载
-  preloadEl.src = '';
+  // 中止正在进行的预加载并释放对应 blob URL
+  clearPreload();
   curImgs = imgs;
   document.getElementById('title').textContent = title;
   document.getElementById('info').textContent = imgs.length + ' 张图片';
@@ -470,12 +470,24 @@ async function updateLB() {
 }
 
 let preloadEl = new Image();
+let preloadUrl = null;
+function clearPreload() {
+  preloadEl.src = '';
+  if (preloadUrl) {
+    URL.revokeObjectURL(preloadUrl);
+    preloadUrl = null;
+  }
+}
 function preloadNext(idx) {
   const d = curImgs[idx];
   imagesDir().then(dir => dir.getDirectoryHandle(d.dn)
     .then(info => info.getFileHandle(d.name + '.' + d.ext))
     .then(fh => fh.getFile())
-    .then(file => { preloadEl.src = URL.createObjectURL(file); })
+    .then(file => {
+      clearPreload();
+      preloadUrl = URL.createObjectURL(file);
+      preloadEl.src = preloadUrl;
+    })
     .catch(() => {})
   );
 }
@@ -485,6 +497,7 @@ function closeLB() {
   document.removeEventListener('keydown', lbKey);
   stopPlay();
   lbUrls.forEach((u, i) => { if (u) { URL.revokeObjectURL(u); lbUrls[i] = null; } });
+  clearPreload();
   document.getElementById('lbImgA').src = '';
   document.getElementById('lbImgB').src = '';
 }
