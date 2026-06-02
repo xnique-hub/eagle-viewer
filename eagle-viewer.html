@@ -59,12 +59,15 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 
 .empty-state{flex:1;display:flex;justify-content:center;align-items:center;color:var(--text-faint);font-size:16px}
 
-.lightbox{display:none;position:fixed;inset:0;background:var(--lb-bg);z-index:1000;justify-content:center;align-items:center;flex-direction:column}
+.lightbox{display:none;position:fixed;inset:0;background:var(--lb-bg);z-index:1000;justify-content:center;align-items:center;flex-direction:column;overflow:hidden}
 .lightbox.open{display:flex}
+.lightbox.fit-width{justify-content:flex-start;overflow-y:auto;padding:56px 0 72px}
 .lb-stage{position:relative;width:95vw;height:82vh;flex-shrink:0}
 .lb-img{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:100%;height:100%;object-fit:contain;transition:opacity .5s ease}
 .lb-img.front{opacity:1;z-index:1}
 .lb-img.back{opacity:0;z-index:0}
+.lightbox.fit-width .lb-stage{width:min(95vw,1600px);height:auto;min-height:0;overflow:visible}
+.lightbox.fit-width .lb-img{top:0;left:50%;transform:translateX(-50%);width:100%;height:auto;object-fit:contain}
 .lightbox-close{position:fixed;top:12px;right:16px;font-size:32px;color:var(--lb-close);cursor:pointer;z-index:1001;opacity:.6;line-height:1}
 .lightbox-close:hover{opacity:1;color:var(--lb-close-hover)}
 .lightbox-nav{position:fixed;top:50%;transform:translateY(-50%);font-size:56px;color:var(--lb-nav);cursor:pointer;z-index:1001;user-select:none;line-height:1}
@@ -73,6 +76,10 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 .lb-next{right:16px}
 .lb-name{margin-top:12px;font-size:14px;color:var(--lb-text-dim)}
 .lb-idx{font-size:13px;color:var(--lb-text-dim);margin-top:4px}
+.lb-toolbar{position:fixed;top:12px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:1001}
+.lb-toolbar button{background:var(--lb-btn);border:none;color:var(--lb-input-text);padding:6px 14px;border-radius:4px;cursor:pointer;font-size:13px;transition:background .15s}
+.lb-toolbar button:hover{background:var(--lb-btn-hover)}
+.lb-toolbar button.active{background:var(--accent)}
 .header-btns{display:flex;align-items:center;gap:10px}
 .header-btns select{padding:4px 8px;background:var(--input-bg);border:1px solid var(--border);border-radius:4px;color:var(--text);font-size:12px;outline:none;cursor:pointer}
 .header-btns select:focus{border-color:var(--accent)}
@@ -129,6 +136,9 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 
 <div class="lightbox" id="lightbox">
   <div class="lightbox-close" onclick="closeLB()">&times;</div>
+  <div class="lb-toolbar">
+    <button id="lbZoomBtn" onclick="toggleLBZoom()" title="切换图片缩放方式">适宽</button>
+  </div>
   <div class="lightbox-nav lb-prev" onclick="navLB(-1)">&#8249;</div>
   <div class="lightbox-nav lb-next" onclick="navLB(1)">&#8250;</div>
   <div class="lb-stage">
@@ -170,6 +180,7 @@ let sortBy = 'name'; // 'name' | 'date'
 let thumbURLs = [], io = null, gridImgMap = new Map();
 let lbUrls = [null, null], lbFront = 0; // 0=A front, 1=B front
 let playTimer = null, isPlaying = false, playInterval = 3;
+let lbFitWidth = localStorage.getItem('lbZoomMode') === 'fit-width';
 const UNCATEGORIZED_ID = '__uncategorized__';
 const UNCATEGORIZED_NODE = { id: UNCATEGORIZED_ID, name: '未分类', children: [], path: '未分类' };
 
@@ -434,9 +445,39 @@ async function loadThumb(el, d) {
 }
 
 // ---- 灯箱 ----
+function applyLBZoom() {
+  const lb = document.getElementById('lightbox');
+  const btn = document.getElementById('lbZoomBtn');
+  lb.classList.toggle('fit-width', lbFitWidth);
+  btn.textContent = lbFitWidth ? '适屏' : '适宽';
+  btn.title = lbFitWidth ? '切换为完整适配屏幕' : '按可视宽度查看长图';
+  btn.classList.toggle('active', lbFitWidth);
+  updateLBStageSize(document.querySelector('.lb-img.front'));
+}
+
+function toggleLBZoom() {
+  lbFitWidth = !lbFitWidth;
+  localStorage.setItem('lbZoomMode', lbFitWidth ? 'fit-width' : 'fit-screen');
+  applyLBZoom();
+  document.getElementById('lightbox').scrollTop = 0;
+}
+
+function updateLBStageSize(img) {
+  const stage = document.querySelector('.lb-stage');
+  if (!lbFitWidth) {
+    stage.style.height = '';
+    return;
+  }
+  if (!img || !img.naturalWidth || !img.naturalHeight) return;
+  const stageW = stage.clientWidth || Math.min(window.innerWidth * 0.95, 1600);
+  stage.style.height = Math.max(1, Math.round(stageW * img.naturalHeight / img.naturalWidth)) + 'px';
+}
+
 async function openLB(i) {
   lbPos = i;
   document.getElementById('lightbox').classList.add('open');
+  document.getElementById('lightbox').scrollTop = 0;
+  applyLBZoom();
   document.addEventListener('keydown', lbKey);
   // 重置双图层
   lbFront = 0;
@@ -470,13 +511,15 @@ async function updateLB() {
   try {
     const url = await loadImageData(d);
     lbUrls[backIdx] = url;
-    backEl.src = url;
     backEl.onload = () => {
       // 交叉淡入淡出
+      updateLBStageSize(backEl);
       backEl.className = 'lb-img front';
       frontEl.className = 'lb-img back';
       lbFront = backIdx;
+      if (lbFitWidth) document.getElementById('lightbox').scrollTop = 0;
     };
+    backEl.src = url;
   } catch {}
 
   // 播放时预加载下一张
@@ -510,6 +553,7 @@ function preloadNext(idx) {
 
 function closeLB() {
   document.getElementById('lightbox').classList.remove('open');
+  document.getElementById('lightbox').scrollTop = 0;
   document.removeEventListener('keydown', lbKey);
   stopPlay();
   lbUrls.forEach((u, i) => { if (u) { URL.revokeObjectURL(u); lbUrls[i] = null; } });
@@ -528,6 +572,7 @@ function lbKey(e) {
   if (e.key === 'Escape') closeLB();
   else if (e.key === 'ArrowLeft') navLB(-1);
   else if (e.key === 'ArrowRight') navLB(1);
+  else if (e.key.toLowerCase() === 'w') toggleLBZoom();
 }
 
 // ---- 自动播放 ----
@@ -588,6 +633,12 @@ document.getElementById('tree').addEventListener('click', e => {
 document.getElementById('lightbox').addEventListener('click', e => {
   if (e.target === document.getElementById('lightbox')) closeLB();
 });
+window.addEventListener('resize', () => {
+  if (document.getElementById('lightbox').classList.contains('open')) {
+    updateLBStageSize(document.querySelector('.lb-img.front'));
+  }
+});
+applyLBZoom();
 </script>
 </body>
 </html>
