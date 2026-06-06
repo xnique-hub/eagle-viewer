@@ -186,7 +186,7 @@ let thumbURLs = [], io = null, gridImgMap = new Map();
 let lbUrls = [null, null], lbFront = 0; // 0=A front, 1=B front
 let playTimer = null, isPlaying = false, playInterval = 3;
 let lbFitWidth = localStorage.getItem('lbZoomMode') === 'fit-width';
-let lbRenderSeq = 0;
+let lbRenderSeq = 0, gridRenderSeq = 0, preloadSeq = 0;
 const UNCATEGORIZED_ID = '__uncategorized__';
 const UNCATEGORIZED_NODE = { id: UNCATEGORIZED_ID, name: '未分类', children: [], path: '未分类' };
 const INDEX_CONCURRENCY = 32;
@@ -415,14 +415,14 @@ async function showAll() {
 
 async function showImgs(title, imgs) {
   lbRenderSeq++;
+  gridRenderSeq++;
+  preloadSeq++;
   // 清理旧缩略图：清空 src 后 revoke 以强制释放 blob URL（避免快速切换文件夹时内存泄漏）
-  gridImgMap.forEach((url, el) => { try { el.src = ''; URL.revokeObjectURL(url); } catch {} });
+  gridImgMap.forEach((url, el) => { try { el.removeAttribute('src'); URL.revokeObjectURL(url); } catch {} });
   gridImgMap.clear();
   thumbURLs = [];
   if (io) { io.disconnect(); io = null; }
-  // 防止灯箱打开时切换文件夹造成灯箱图片 blob URL 泄漏
-  try { document.getElementById('lbImgA').src = ''; } catch {}
-  try { document.getElementById('lbImgB').src = ''; } catch {}
+  clearLBImages();
   // 中止正在进行的预加载并释放对应 blob URL
   clearPreload();
   curImgs = imgs;
@@ -442,25 +442,30 @@ async function showImgs(title, imgs) {
   io = new IntersectionObserver(es => {
     for (const e of es) {
       if (!e.isIntersecting) continue;
-      loadThumb(e.target, curImgs[+e.target.dataset.i]);
+      loadThumb(e.target, curImgs[+e.target.dataset.i], gridRenderSeq);
       io.unobserve(e.target);
     }
   }, { root: grid, rootMargin: '300px' });
   grid.querySelectorAll('img[data-i]').forEach(el => io.observe(el));
 }
 
-async function loadThumb(el, d) {
+async function loadThumb(el, d, seq) {
+  let url = null;
   try {
     const dir = await imagesDir();
     const info = await dir.getDirectoryHandle(d.dn);
     let file;
     try { file = await (await info.getFileHandle(d.name + '_thumbnail.png')).getFile(); }
     catch { file = await (await info.getFileHandle(d.name + '.' + d.ext)).getFile(); }
-    const url = URL.createObjectURL(file);
+    url = URL.createObjectURL(file);
+    if (seq !== gridRenderSeq || !el.isConnected) { URL.revokeObjectURL(url); return; }
     thumbURLs.push(url);
     gridImgMap.set(el, url);
     el.src = url;
-  } catch { el.alt = '?'; }
+  } catch {
+    if (url) URL.revokeObjectURL(url);
+    if (seq === gridRenderSeq && el.isConnected) el.alt = '?';
+  }
 }
 
 // ---- 灯箱 ----
@@ -503,6 +508,15 @@ function settleLBLayer(img, cls, empty = false) {
   img.className = `lb-img ${cls}${empty ? ' empty' : ''} no-transition`;
 }
 
+function clearLBImages() {
+  lbFront = 0;
+  lbUrls.forEach((u, i) => { if (u) { URL.revokeObjectURL(u); lbUrls[i] = null; } });
+  document.getElementById('lbImgA').removeAttribute('src');
+  document.getElementById('lbImgB').removeAttribute('src');
+  document.getElementById('lbImgA').className = 'lb-img back empty no-transition';
+  document.getElementById('lbImgB').className = 'lb-img back empty no-transition';
+}
+
 function animateLBSwap(frontEl, backEl, seq, nextFrontIdx, frontWasEmpty) {
   settleLBLayer(backEl, 'back');
   settleLBLayer(frontEl, 'front', frontWasEmpty);
@@ -524,12 +538,7 @@ async function openLB(i) {
   applyLBZoom();
   document.addEventListener('keydown', lbKey);
   // 重置双图层
-  lbFront = 0;
-  lbUrls.forEach((u, j) => { if (u) { URL.revokeObjectURL(u); lbUrls[j] = null; } });
-  document.getElementById('lbImgA').removeAttribute('src');
-  document.getElementById('lbImgB').removeAttribute('src');
-  document.getElementById('lbImgA').className = 'lb-img back empty no-transition';
-  document.getElementById('lbImgB').className = 'lb-img back empty no-transition';
+  clearLBImages();
   await updateLB();
 }
 
@@ -596,13 +605,16 @@ function clearPreload() {
   }
 }
 function preloadNext(idx) {
+  const seq = ++preloadSeq;
   const d = curImgs[idx];
   imagesDir().then(dir => dir.getDirectoryHandle(d.dn)
     .then(info => info.getFileHandle(d.name + '.' + d.ext))
     .then(fh => fh.getFile())
     .then(file => {
+      if (seq !== preloadSeq) return;
       clearPreload();
       preloadUrl = URL.createObjectURL(file);
+      if (seq !== preloadSeq) { URL.revokeObjectURL(preloadUrl); preloadUrl = null; return; }
       preloadEl.src = preloadUrl;
     })
     .catch(() => {})
@@ -615,12 +627,9 @@ function closeLB() {
   document.getElementById('lightbox').scrollTop = 0;
   document.removeEventListener('keydown', lbKey);
   stopPlay();
-  lbUrls.forEach((u, i) => { if (u) { URL.revokeObjectURL(u); lbUrls[i] = null; } });
+  preloadSeq++;
   clearPreload();
-  document.getElementById('lbImgA').removeAttribute('src');
-  document.getElementById('lbImgB').removeAttribute('src');
-  document.getElementById('lbImgA').className = 'lb-img back empty no-transition';
-  document.getElementById('lbImgB').className = 'lb-img back empty no-transition';
+  clearLBImages();
 }
 
 function navLB(dir) {
