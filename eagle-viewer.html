@@ -64,6 +64,8 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 .lightbox.fit-width{justify-content:flex-start;overflow-y:auto;padding:56px 0 72px}
 .lb-stage{position:relative;width:98vw;height:calc(100vh - 96px);flex-shrink:0}
 .lb-img{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:100%;height:100%;object-fit:contain;transition:opacity .5s ease}
+.lb-img.no-transition{transition:none}
+.lb-img.empty{display:none}
 .lb-img.front{opacity:1;z-index:1}
 .lb-img.back{opacity:0;z-index:0}
 .lightbox.fit-width .lb-stage{width:min(95vw,1600px);height:auto;min-height:0;overflow:visible}
@@ -483,6 +485,26 @@ function resetLBStageSize() {
   stage.style.height = lbFitWidth ? 'calc(100vh - 128px)' : '';
 }
 
+function settleLBLayer(img, cls, empty = false) {
+  img.onload = null;
+  img.onerror = null;
+  img.className = `lb-img ${cls}${empty ? ' empty' : ''} no-transition`;
+}
+
+function animateLBSwap(frontEl, backEl, seq, nextFrontIdx, frontWasEmpty) {
+  settleLBLayer(backEl, 'back');
+  settleLBLayer(frontEl, 'front', frontWasEmpty);
+  backEl.offsetWidth;
+  backEl.classList.remove('no-transition');
+  frontEl.classList.remove('no-transition');
+  requestAnimationFrame(() => {
+    if (seq !== lbRenderSeq) return;
+    backEl.className = 'lb-img front';
+    frontEl.className = `lb-img back${frontWasEmpty ? ' empty' : ''}`;
+    lbFront = nextFrontIdx;
+  });
+}
+
 async function openLB(i) {
   lbPos = i;
   document.getElementById('lightbox').classList.add('open');
@@ -492,10 +514,10 @@ async function openLB(i) {
   // 重置双图层
   lbFront = 0;
   lbUrls.forEach((u, j) => { if (u) { URL.revokeObjectURL(u); lbUrls[j] = null; } });
-  document.getElementById('lbImgA').src = '';
-  document.getElementById('lbImgB').src = '';
-  document.getElementById('lbImgA').className = 'lb-img back';
-  document.getElementById('lbImgB').className = 'lb-img back';
+  document.getElementById('lbImgA').removeAttribute('src');
+  document.getElementById('lbImgB').removeAttribute('src');
+  document.getElementById('lbImgA').className = 'lb-img back empty no-transition';
+  document.getElementById('lbImgB').className = 'lb-img back empty no-transition';
   await updateLB();
 }
 
@@ -517,30 +539,34 @@ async function updateLB() {
   const backIdx = 1 - lbFront;
   const frontEl = document.getElementById(lbFront === 0 ? 'lbImgA' : 'lbImgB');
   const backEl = document.getElementById(backIdx === 0 ? 'lbImgA' : 'lbImgB');
+  const frontHasImage = !!lbUrls[lbFront];
 
   // 释放 back 旧 URL
   if (lbUrls[backIdx]) { URL.revokeObjectURL(lbUrls[backIdx]); lbUrls[backIdx] = null; }
+  settleLBLayer(frontEl, 'front', !frontHasImage);
+  settleLBLayer(backEl, 'back', true);
+  backEl.removeAttribute('src');
 
+  let url = null;
   try {
-    const url = await loadImageData(d);
+    url = await loadImageData(d);
     if (seq !== lbRenderSeq) { URL.revokeObjectURL(url); return; }
     lbUrls[backIdx] = url;
-    backEl.onload = null;
-    backEl.onerror = null;
-    backEl.onload = () => {
-      if (seq !== lbRenderSeq) return;
-      // 交叉淡入淡出
-      updateLBStageSize(backEl);
-      backEl.className = 'lb-img front';
-      frontEl.className = 'lb-img back';
-      lbFront = backIdx;
-      if (lbFitWidth) document.getElementById('lightbox').scrollTop = 0;
-    };
-    backEl.onerror = () => {
-      if (seq === lbRenderSeq) resetLBStageSize();
-    };
+    const loadFallback = backEl.decode ? null : new Promise((resolve, reject) => {
+      backEl.onload = resolve;
+      backEl.onerror = reject;
+    });
     backEl.src = url;
-  } catch {}
+    if (backEl.decode) await backEl.decode();
+    else await loadFallback;
+    if (seq !== lbRenderSeq) { if (lbUrls[backIdx] === url) { URL.revokeObjectURL(url); lbUrls[backIdx] = null; } return; }
+    updateLBStageSize(backEl);
+    animateLBSwap(frontEl, backEl, seq, backIdx, !frontHasImage);
+    if (lbFitWidth) document.getElementById('lightbox').scrollTop = 0;
+  } catch {
+    if (url && lbUrls[backIdx] === url) { URL.revokeObjectURL(url); lbUrls[backIdx] = null; }
+    if (seq === lbRenderSeq) resetLBStageSize();
+  }
 
   // 播放时预加载下一张
   if (isPlaying && lbPos + 1 < curImgs.length) {
@@ -579,8 +605,10 @@ function closeLB() {
   stopPlay();
   lbUrls.forEach((u, i) => { if (u) { URL.revokeObjectURL(u); lbUrls[i] = null; } });
   clearPreload();
-  document.getElementById('lbImgA').src = '';
-  document.getElementById('lbImgB').src = '';
+  document.getElementById('lbImgA').removeAttribute('src');
+  document.getElementById('lbImgB').removeAttribute('src');
+  document.getElementById('lbImgA').className = 'lb-img back empty no-transition';
+  document.getElementById('lbImgB').className = 'lb-img back empty no-transition';
 }
 
 function navLB(dir) {
