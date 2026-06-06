@@ -189,6 +189,8 @@ let lbFitWidth = localStorage.getItem('lbZoomMode') === 'fit-width';
 let lbRenderSeq = 0;
 const UNCATEGORIZED_ID = '__uncategorized__';
 const UNCATEGORIZED_NODE = { id: UNCATEGORIZED_ID, name: '未分类', children: [], path: '未分类' };
+const INDEX_CONCURRENCY = 32;
+const nameCollator = new Intl.Collator('zh');
 
 const imagesDir = async () => {
   if (!imagesDirH) imagesDirH = await dirH.getDirectoryHandle('images');
@@ -281,30 +283,40 @@ function idxFolders(nodes, pp) {
 
 async function indexImgs() {
   const dir = await imagesDir();
-  let c = 0;
-  for await (const entry of dir.values()) {
-    if (!entry.name.endsWith('.info')) continue;
+  const pending = new Set();
+  let c = 0, seen = 0;
+  const addImg = ({ img, folders }) => {
+    if (folders.length === 0) {
+      folderImgMap[UNCATEGORIZED_ID].push(img);
+    }
+    for (const fid of folders) {
+      if (folderImgMap[fid]) folderImgMap[fid].push(img);
+      else folderImgMap[fid] = [img];
+    }
+    c++;
+  };
+  const readEntry = async entry => {
     try {
       const m = JSON.parse(await (await (await entry.getFileHandle('metadata.json')).getFile()).text());
-      if (m.isDeleted === true) continue;
+      if (m.isDeleted === true) return;
       const img = { id: m.id, name: m.name || '', ext: m.ext || '', dn: entry.name, btime: m.btime || 0 };
-      const folders = Array.isArray(m.folders) ? m.folders : [];
-      if (folders.length === 0) {
-        folderImgMap[UNCATEGORIZED_ID].push(img);
-      }
-      for (const fid of folders) {
-        if (folderImgMap[fid]) folderImgMap[fid].push(img);
-        else folderImgMap[fid] = [img];
-      }
-      c++;
+      addImg({ img, folders: Array.isArray(m.folders) ? m.folders : [] });
     } catch {}
-    if (c % 100 === 0) {
+  };
+  for await (const entry of dir.values()) {
+    if (!entry.name.endsWith('.info')) continue;
+    seen++;
+    const task = readEntry(entry).finally(() => pending.delete(task));
+    pending.add(task);
+    if (pending.size >= INDEX_CONCURRENCY) await Promise.race(pending);
+    if (seen % 200 === 0) {
       document.getElementById('footer').textContent = `索引中... ${c}`;
       await new Promise(r => setTimeout(r, 0));
     }
   }
+  await Promise.all(pending);
   totalCount = c;
-  for (const fid in folderImgMap) folderImgMap[fid].sort((a, b) => a.name.localeCompare(b.name, 'zh'));
+  for (const fid in folderImgMap) folderImgMap[fid].sort((a, b) => nameCollator.compare(a.name, b.name));
   function calc(nodes) {
     for (const n of nodes) {
       let s = (folderImgMap[n.id] || []).length;
@@ -365,7 +377,7 @@ function treeHTML(nodes, d, f, ancestors) {
 function sortImgs(arr) {
   return arr.sort((a, b) => {
     if (sortBy === 'date') return a.btime - b.btime;
-    return a.name.localeCompare(b.name, 'zh');
+    return nameCollator.compare(a.name, b.name);
   });
 }
 
