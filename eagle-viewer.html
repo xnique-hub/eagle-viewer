@@ -198,6 +198,11 @@ const imagesDir = async () => {
 };
 
 const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const imgResolution = d => d.width && d.height ? `${d.width}×${d.height}` : '';
+const imgDisplayName = d => {
+  const res = imgResolution(d);
+  return res ? `${d.name} · ${res}` : d.name;
+};
 
 // ---- 主题 ----
 function applyTheme(t) {
@@ -299,7 +304,9 @@ async function indexImgs() {
     try {
       const m = JSON.parse(await (await (await entry.getFileHandle('metadata.json')).getFile()).text());
       if (m.isDeleted === true) return;
-      const img = { id: m.id, name: m.name || '', ext: m.ext || '', dn: entry.name, btime: m.btime || 0 };
+      const width = m.width || m.resolutionWidth || 0;
+      const height = m.height || m.resolutionHeight || 0;
+      const img = { id: m.id, name: m.name || '', ext: m.ext || '', dn: entry.name, btime: m.btime || 0, width, height };
       addImg({ img, folders: Array.isArray(m.folders) ? m.folders : [] });
     } catch {}
   };
@@ -552,7 +559,7 @@ async function loadImageData(d) {
 async function updateLB() {
   const seq = ++lbRenderSeq;
   const d = curImgs[lbPos];
-  document.getElementById('lbName').textContent = d.name;
+  document.getElementById('lbName').textContent = imgDisplayName(d);
   document.getElementById('lbIdx').textContent = `${lbPos+1} / ${curImgs.length}`;
   if (lbFitWidth) document.getElementById('lightbox').scrollTop = 0;
   resetLBStageSize();
@@ -581,6 +588,11 @@ async function updateLB() {
     if (backEl.decode) await backEl.decode();
     else await loadFallback;
     if (seq !== lbRenderSeq) { if (lbUrls[backIdx] === url) { URL.revokeObjectURL(url); lbUrls[backIdx] = null; } return; }
+    if ((!d.width || !d.height) && backEl.naturalWidth && backEl.naturalHeight) {
+      d.width = backEl.naturalWidth;
+      d.height = backEl.naturalHeight;
+      document.getElementById('lbName').textContent = imgDisplayName(d);
+    }
     updateLBStageSize(backEl);
     animateLBSwap(frontEl, backEl, seq, backIdx, !frontHasImage);
     if (lbFitWidth) document.getElementById('lightbox').scrollTop = 0;
