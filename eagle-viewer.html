@@ -64,6 +64,19 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 .lightbox.fit-width{justify-content:flex-start;overflow-y:auto;padding:56px 0 72px}
 .lb-stage{position:relative;width:98vw;height:calc(100vh - 96px);flex-shrink:0}
 .lb-img{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:100%;height:100%;object-fit:contain;transition:opacity .5s ease}
+.lb-viewport{display:contents}
+.lightbox.manual-zoom .lb-viewport{display:block;position:absolute;inset:56px 0 72px;overflow:auto}
+.lightbox.manual-zoom .lb-stage{margin:auto;min-width:0;min-height:0;flex-shrink:0}
+.lightbox.manual-zoom .lb-img{top:0;left:0;transform:none;width:100%;height:100%}
+.lightbox.manual-zoom .lb-img.back{width:0;height:0}
+.lb-map{position:fixed;right:24px;bottom:84px;z-index:1002;padding:4px;background:var(--lb-bar);border:1px solid var(--lb-text-dim);border-radius:4px}
+.lb-map[hidden]{display:none}
+.lb-map-inner{position:relative;cursor:crosshair;touch-action:none;user-select:none}
+.lb-map-view{cursor:grab}
+.lb-viewport .lb-img{user-select:none;-webkit-user-drag:none;cursor:grab;touch-action:none}
+.lightbox.lb-dragging .lb-img,.lb-map-inner.lb-dragging,.lb-map-inner.lb-dragging .lb-map-view{cursor:grabbing}
+.lb-map img{display:block;width:100%;height:100%}
+.lb-map-view{position:absolute;border:2px solid var(--accent);background:rgba(233,69,96,.15);box-sizing:border-box}
 .lb-img.no-transition{transition:none}
 .lb-img.empty{display:none}
 .lb-img.front{opacity:1;z-index:1}
@@ -142,14 +155,19 @@ html,body{height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFo
 <div class="lightbox" id="lightbox">
   <div class="lightbox-close" onclick="closeLB()">&times;</div>
   <div class="lb-toolbar">
+    <button onclick="changeLBScale(1)" title="放大（↑）">↑ 放大</button>
+    <button onclick="changeLBScale(-1)" title="缩小（↓）">↓ 缩小</button>
     <button id="lbZoomBtn" onclick="toggleLBZoom()" title="切换图片缩放方式">适宽</button>
   </div>
   <div class="lightbox-nav lb-prev" onclick="navLB(-1)">&#8249;</div>
   <div class="lightbox-nav lb-next" onclick="navLB(1)">&#8250;</div>
+  <div class="lb-viewport" id="lbViewport">
   <div class="lb-stage">
     <img id="lbImgA" class="lb-img front" src="">
     <img id="lbImgB" class="lb-img back" src="">
   </div>
+  </div>
+  <div class="lb-map" id="lbMap" hidden><div class="lb-map-inner" id="lbMapInner"><img id="lbMapImg" alt="图片全览"><div class="lb-map-view" id="lbMapView"></div></div></div>
   <div class="lb-name" id="lbName"></div>
   <div class="lb-idx" id="lbIdx"></div>
   <div class="play-bar" id="playBar">
@@ -476,6 +494,105 @@ async function loadThumb(el, d, seq) {
 }
 
 // ---- 灯箱 ----
+let lbScale = null;
+function resetLBScale() {
+  endLBDrag();
+  lbScale = null;
+  document.getElementById('lightbox').classList.remove('manual-zoom');
+  document.getElementById('lbMap').hidden = true;
+  document.getElementById('lbMapImg').removeAttribute('src');
+  document.querySelector('.lb-stage').style.width = '';
+}
+function changeLBScale(direction) {
+  const img = document.querySelector('.lb-img.front');
+  if (!img || !img.naturalWidth || img.classList.contains('empty')) return;
+  const viewport = document.getElementById('lbViewport');
+  const rect = img.getBoundingClientRect();
+  const scale = lbScale ?? (lbFitWidth ? rect.width / img.naturalWidth : Math.min(rect.width / img.naturalWidth, rect.height / img.naturalHeight));
+  const cx = lbScale === null ? .5 : (viewport.scrollLeft + viewport.clientWidth / 2) / document.querySelector('.lb-stage').offsetWidth;
+  const cy = lbScale === null ? .5 : (viewport.scrollTop + viewport.clientHeight / 2) / document.querySelector('.lb-stage').offsetHeight;
+  lbScale = Math.max(.05, Math.min(16, scale * (direction > 0 ? 1.25 : .8)));
+  document.getElementById('lightbox').classList.add('manual-zoom');
+  updateLBStageSize(img);
+  const stage = document.querySelector('.lb-stage');
+  viewport.scrollLeft = cx * stage.offsetWidth - viewport.clientWidth / 2;
+  viewport.scrollTop = cy * stage.offsetHeight - viewport.clientHeight / 2;
+  updateLBMap();
+}
+function updateLBMap() {
+  if (lbScale === null && !lbFitWidth) return;
+  const img = document.querySelector('.lb-img.front');
+  if (!img || !img.naturalWidth || img.classList.contains('empty')) return;
+  const map = document.getElementById('lbMap');
+  const inner = document.getElementById('lbMapInner');
+  const mini = document.getElementById('lbMapImg');
+  const factor = Math.min(160 / img.naturalWidth, 180 / img.naturalHeight);
+  const w = img.naturalWidth * factor, h = img.naturalHeight * factor;
+  inner.style.width = w + 'px'; inner.style.height = h + 'px';
+  if (mini.getAttribute('src') !== img.getAttribute('src')) mini.src = img.src;
+  map.hidden = false;
+  const r = img.getBoundingClientRect();
+  const area = getLBScrollArea();
+  const v = lbScale === null ? {left:0, top:56, right:area.clientWidth, bottom:window.innerHeight - 72} : area.getBoundingClientRect();
+  const box = document.getElementById('lbMapView');
+  const x = Math.max(0, v.left - r.left), y = Math.max(0, v.top - r.top);
+  box.style.left = x / r.width * w + 'px'; box.style.top = y / r.height * h + 'px';
+  box.style.width = Math.max(0, Math.min(r.right, v.right) - Math.max(r.left, v.left)) / r.width * w + 'px';
+  box.style.height = Math.max(0, Math.min(r.bottom, v.bottom) - Math.max(r.top, v.top)) / r.height * h + 'px';
+}
+
+// Pointer capture keeps both drag surfaces active when the pointer leaves them.
+let lbDrag = null;
+function getLBScrollArea() {
+  return document.getElementById(lbScale === null ? 'lightbox' : 'lbViewport');
+}
+function endLBDrag() {
+  if (!lbDrag) return;
+  const {surface, pointerId} = lbDrag;
+  lbDrag = null;
+  if (surface.hasPointerCapture(pointerId)) surface.releasePointerCapture(pointerId);
+  surface.classList.remove('lb-dragging');
+  document.getElementById('lightbox').classList.remove('lb-dragging');
+}
+function installLBDrag(surface, overview) {
+  surface.addEventListener('dragstart', e => e.preventDefault());
+  surface.addEventListener('pointerdown', e => {
+    if (e.button !== 0 || lbDrag) return;
+    const img = document.querySelector('.lb-img.front');
+    if (!img || img.classList.contains('empty') || !img.naturalWidth) return;
+    if (!overview && !e.target.matches('.lb-img.front')) return;
+    const area = getLBScrollArea();
+    if (!overview && area.scrollWidth <= area.clientWidth && area.scrollHeight <= area.clientHeight) return;
+    e.preventDefault();
+    const r = surface.getBoundingClientRect(), imageRect = img.getBoundingClientRect();
+    const fx = overview ? imageRect.width / r.width : -1;
+    const fy = overview ? imageRect.height / r.height : -1;
+    if (overview && !e.target.closest('.lb-map-view')) {
+      const box = document.getElementById('lbMapView').getBoundingClientRect();
+      area.scrollLeft += (e.clientX - (box.left + box.width / 2)) * fx;
+      area.scrollTop += (e.clientY - (box.top + box.height / 2)) * fy;
+    }
+    lbDrag = {surface, pointerId:e.pointerId, area, x:e.clientX, y:e.clientY,
+      left:area.scrollLeft, top:area.scrollTop, fx, fy};
+    surface.setPointerCapture(e.pointerId);
+    surface.classList.add('lb-dragging');
+    document.getElementById('lightbox').classList.add('lb-dragging');
+    updateLBMap();
+  });
+  surface.addEventListener('pointermove', e => {
+    if (!lbDrag || lbDrag.surface !== surface || lbDrag.pointerId !== e.pointerId) return;
+    const d = lbDrag;
+    d.area.scrollLeft = d.left + (e.clientX - d.x) * d.fx;
+    d.area.scrollTop = d.top + (e.clientY - d.y) * d.fy;
+    updateLBMap();
+  });
+  for (const type of ['pointerup', 'pointercancel', 'lostpointercapture']) {
+    surface.addEventListener(type, e => {
+      if (lbDrag && lbDrag.surface === surface && lbDrag.pointerId === e.pointerId) endLBDrag();
+    });
+  }
+}
+
 function applyLBZoom() {
   const lb = document.getElementById('lightbox');
   const btn = document.getElementById('lbZoomBtn');
@@ -487,14 +604,22 @@ function applyLBZoom() {
 }
 
 function toggleLBZoom() {
+  resetLBScale();
   lbFitWidth = !lbFitWidth;
   localStorage.setItem('lbZoomMode', lbFitWidth ? 'fit-width' : 'fit-screen');
   applyLBZoom();
   document.getElementById('lightbox').scrollTop = 0;
+  updateLBMap();
 }
 
 function updateLBStageSize(img) {
   const stage = document.querySelector('.lb-stage');
+  if (lbScale !== null && img && img.naturalWidth) {
+    stage.style.width = img.naturalWidth * lbScale + 'px';
+    stage.style.height = img.naturalHeight * lbScale + 'px';
+    updateLBMap();
+    return;
+  }
   if (!lbFitWidth) {
     stage.style.height = '';
     return;
@@ -535,6 +660,7 @@ function animateLBSwap(frontEl, backEl, seq, nextFrontIdx, frontWasEmpty) {
     backEl.className = 'lb-img front';
     frontEl.className = `lb-img back${frontWasEmpty ? ' empty' : ''}`;
     lbFront = nextFrontIdx;
+    updateLBMap();
   });
 }
 
@@ -557,6 +683,7 @@ async function loadImageData(d) {
 }
 
 async function updateLB() {
+  resetLBScale();
   const seq = ++lbRenderSeq;
   const d = curImgs[lbPos];
   document.getElementById('lbName').textContent = imgDisplayName(d);
@@ -634,6 +761,7 @@ function preloadNext(idx) {
 }
 
 function closeLB() {
+  resetLBScale();
   lbRenderSeq++;
   document.getElementById('lightbox').classList.remove('open');
   document.getElementById('lightbox').scrollTop = 0;
@@ -651,6 +779,20 @@ function navLB(dir) {
 }
 
 function lbKey(e) {
+  if (e.target.closest('input, textarea, select, [contenteditable]')) return;
+  if (e.key === '0' && lbScale !== null) {
+    e.preventDefault();
+    resetLBScale();
+    applyLBZoom();
+    document.getElementById('lightbox').scrollTop = 0;
+    updateLBMap();
+    return;
+  }
+  if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+    e.preventDefault();
+    changeLBScale(e.key === 'ArrowUp' ? 1 : -1);
+    return;
+  }
   if (e.key === 'Escape') closeLB();
   else if (e.key === 'ArrowLeft') navLB(-1);
   else if (e.key === 'ArrowRight') navLB(1);
@@ -717,9 +859,15 @@ document.getElementById('lightbox').addEventListener('click', e => {
 });
 window.addEventListener('resize', () => {
   if (document.getElementById('lightbox').classList.contains('open')) {
+    endLBDrag();
     updateLBStageSize(document.querySelector('.lb-img.front'));
+    updateLBMap();
   }
 });
+document.getElementById('lbViewport').addEventListener('scroll', updateLBMap);
+document.getElementById('lightbox').addEventListener('scroll', updateLBMap);
+installLBDrag(document.getElementById('lbViewport'), false);
+installLBDrag(document.getElementById('lbMapInner'), true);
 applyLBZoom();
 </script>
 </body>

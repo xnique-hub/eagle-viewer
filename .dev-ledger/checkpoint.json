@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "recorded_at": "2026-10-22T21:23:16+08:00",
+  "observed_head": "3f11e8cf1599c37d71e994a65192b79dc7cd108b",
+  "documents": {
+    "需求.spec.md": "349a8a89c6016a8a0c04becbf79f4bf8feab8331b201a42369a2b15855f52e41",
+    "设计.spec.md": "931984f2fa32690fa96b64d69776babb93777f2eac661928166fcac181c5378e",
+    "测试.spec.md": "ac032136b409cb284f98f8586386b64695648c838cef5e454f77601afa2924a1",
+    "changelog.md": "c891f5c4392b755a83386475d209650f7fea51193b6223acf18ae91cc1a2cd6c"
+  }
+}
